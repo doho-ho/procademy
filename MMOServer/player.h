@@ -21,7 +21,6 @@ public:
 	WCHAR nickName[dfNICK_MAX_LEN];
 
 	// 기타 필요 컨텐츠들 다음에 추가.
-
 public:
 	player();
 	~player();

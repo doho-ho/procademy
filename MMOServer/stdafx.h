@@ -39,6 +39,7 @@
 #include "APIHook.h"
 #include "CCrashDump.h"
 #include "processCPUCheck.h"
+#include "profiling.h"
 
 #include "log.h"
 #include "memoryPool.h"

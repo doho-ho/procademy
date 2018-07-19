@@ -10,9 +10,6 @@ GameSession::GameSession()
 	logoutFlag = false;
 	authTOgame = false;
 	shutFlag = false;
-
-	completeRecvQ = new lockFreeQueue<Sbuf*>;
-	sendQ = new lockFreeQueue<Sbuf*>;
 }
 
 GameSession::~GameSession()
@@ -26,12 +23,12 @@ void GameSession::sendPacket(Sbuf *_buf, bool _type)
 	if (Mode == MODE_NONE) return;
 	_buf->Encode(bufCode, bufKey1, bufKey2);
 	_buf->addRef();
-	sendQ->enqueue(_buf);
+	sendQ.enqueue(_buf);
 
 	if (_type)
 	{
 		InterlockedCompareExchange(&disconnectFlag, true, false);
-		if (sendQ->getUsedSize() == 0)
+		if (sendQ.getUsedSize() == 0)
 			disconnect();
 	}
 	return;

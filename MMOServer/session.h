@@ -19,9 +19,9 @@ public:
 	en_SESSION_MODE	Mode;		// 현재 세션의 모드
 
 	winBuffer		recvQ;
-	lockFreeQueue<Sbuf*> *completeRecvQ;
+	lockFreeQueue<Sbuf*> completeRecvQ;
 	
-	lockFreeQueue<Sbuf*> *sendQ;
+	lockFreeQueue<Sbuf*> sendQ;
 	unsigned int sendCount;
 
 	OVERLAPPED recvOver;

@@ -196,7 +196,7 @@ void MMOServer::sendPost(player *_ss)
 	int count, size, retval, err;
 	Sbuf *node = NULL;
 	WSABUF buf[maxWSABUF];
-	size = _ss->sendQ->getUsedSize();
+	size = _ss->sendQ.getUsedSize();
 	if (size <= 0)
 		return;
 	if (FALSE == (BOOL)InterlockedCompareExchange(&(_ss->sendFlag), TRUE, FALSE))
@@ -204,7 +204,7 @@ void MMOServer::sendPost(player *_ss)
 		count = 0;
 		retval = 0;
 		ZeroMemory(&(_ss->sendOver), sizeof(_ss->sendOver));
-		lockFreeQueue<Sbuf*> *sendQ = _ss->sendQ;
+		lockFreeQueue<Sbuf*> *sendQ = &_ss->sendQ;
 		do
 		{
 			for (count; count < maxWSABUF; count++)
@@ -251,16 +251,17 @@ void MMOServer::completeRecv(DWORD _trans, player *_ss)
 		_ss->disconnect();
 		return;
 	}
-	int usedSize, retval, retval1;
+	int retval, usedSize;
 	int headerSize = sizeof(header);
+	header head;
 
 	winBuffer *recvQ = &_ss->recvQ;
 	Sbuf *buf = NULL;
 	recvQ->moveRearPos(_trans);
-	while (usedSize = recvQ->getUsedSize())
+	while (1)
 	{
-		header head;
-		retval = recvQ->peek((char*)&head, headerSize);
+		usedSize = recvQ->getUsedSize();	
+		retval= recvQ->peek((char*)&head, headerSize);
 		if (retval < headerSize || (usedSize - headerSize) < head.len)
 			break;
 		InterlockedIncrement(&recvTPS);
@@ -270,7 +271,7 @@ void MMOServer::completeRecv(DWORD _trans, player *_ss)
 			recvQ->dequeue(buf->getBufPtr(), headerSize + head.len);
 			buf->moveRearPos(head.len);
 			if (buf->Decode(bufCode, bufKey1, bufKey2))
-				_ss->completeRecvQ->enqueue(buf);
+				_ss->completeRecvQ.enqueue(buf);
 			else
 				throw 4900;
 		}
@@ -296,7 +297,7 @@ void MMOServer::completeSend(DWORD _trans, player *_ss)
 	}
 	Sbuf *buf = NULL;
 	int sendCount, count;
-	lockFreeQueue<Sbuf*> *sendQ = _ss->sendQ;
+	lockFreeQueue<Sbuf*> *sendQ = &_ss->sendQ;
 	sendCount = _ss->sendCount;
 	count = 0;
 	for (count; count < sendCount;)
@@ -310,7 +311,7 @@ void MMOServer::completeSend(DWORD _trans, player *_ss)
 	}
 	InterlockedDecrement(&_ss->sendFlag);
 	// 보내고 끊기 기능
-	if (_ss->sendQ->getUsedSize() == 0 && _ss->disconnectFlag == 1)
+	if (_ss->sendQ.getUsedSize() == 0 && _ss->disconnectFlag == 1)
 	{
 		if (true == InterlockedCompareExchange(&(_ss->disconnectFlag), true, true))
 			_ss->disconnect();
@@ -378,7 +379,7 @@ unsigned __stdcall MMOServer::AUTHThread(LPVOID _data)
 		node->AUTHMODE();			// 모드 변경 파트
 	//	node->onAuth_Update();
 		node->authFrame++;
-		Sleep(5);	// 2 -10ms 단위
+		Sleep(10);	// 2 -10ms 단위
 	}
 	return 0;
 }
@@ -402,14 +403,16 @@ void MMOServer::acceptProcess(void)
 			delete data;
 			continue;
 		}
+		if (indexStack.pop(&index) == -1)
+			CCrashDump::Crash();
 		
-		indexStack.pop(&index);
 		sessionArry[index].arryIndex = index;
 		sessionArry[index].clientID = setID(index, id);
 		id++;
 		sessionArry[index].setSession(data->sock);
 		CreateIoCompletionPort((HANDLE)data->sock, IOCPHandle, (ULONG_PTR)&sessionArry[index], 0);
 		InterlockedIncrement(&sessionArry[index].IOCount);
+
 		sessionArry[index].onAuth_clientJoin();
 		recvPost(&sessionArry[index]);
 		sessionArry[index].Mode = MODE_AUTH;
@@ -428,23 +431,23 @@ void MMOServer::checkProcess(void)
 	int count = 0;
 	int delayCount = 0;
 	Sbuf *buf = NULL;
-	lockFreeQueue<Sbuf*> *queue = NULL;
 	for (count; count < maxSession; count++)
 	{
 		if (sessionArry[count].Mode == MODE_AUTH)
 		{
-			queue = sessionArry[count].completeRecvQ;
 			while (delayCount < AUTH_PACKET_DELAY)
 			{
 				buf = NULL;
-				if (-1 == queue->dequeue(&buf))
+
+				sessionArry[count].completeRecvQ.dequeue(&buf);
+				if (!buf)
 					break;
 
 				delayCount++;
 				sessionArry[count].onAuth_Packet(buf);
 				buf->Free();
 			}
-			if (sessionArry[count].logoutFlag == true && sessionArry[count].sendQ->getUsedSize() == 0)
+			if (sessionArry[count].logoutFlag == true && sessionArry[count].sendFlag == false)
 				sessionArry[count].Mode = MODE_LOGOUT_IN_AUTH;
 		}
 	}
@@ -459,7 +462,7 @@ void MMOServer::AUTHMODE(void)
 	{
 		if (sessionArry[count].Mode == MODE_LOGOUT_IN_AUTH)
 		{
-			if (sessionArry[count].sendFlag == false && sessionArry[count].sendQ->getUsedSize() == 0)
+			if (sessionArry[count].sendFlag == false && sessionArry[count].sendQ.getUsedSize() == 0)
 			{
 				authCount--;
 				InterlockedIncrement(&logoutCount);
@@ -487,7 +490,7 @@ unsigned __stdcall MMOServer::GameThread(LPVOID _data)
 	{
 		if (node->threadFlag)
 			break;
-		node->GAMEMODE();;
+		node->GAMEMODE();
 		node->gamePacket();
 	//	node->onGame_Update();
 		node->logoutProcess();
@@ -512,6 +515,8 @@ void MMOServer::GAMEMODE(void)
 			sessionArry[count].onGame_clientJoin();
 			dealy++;
 		}
+		if (sessionArry[count].logoutFlag == true && sessionArry[count].sendFlag == false)
+			sessionArry[count].Mode = MODE_LOGOUT_IN_GAME;
 	}
 	return;
 }
@@ -521,27 +526,24 @@ void MMOServer::gamePacket(void)
 	// 세션을 모두 돌면서 completeRecvQ의 데이터 뽑아서 처리.
 	int count = 0, loop = 0;
 	Sbuf *buf = NULL;
-	lockFreeQueue<Sbuf*> *userQueue = NULL;
 	for (count; count < maxSession; count++)
 	{
 		if (sessionArry[count].Mode == MODE_GAME)
 		{
 			loop = 0;
-			userQueue = sessionArry[count].completeRecvQ;
 			while (loop < GAME_PACKET_DEALY)
 			{
 				buf = NULL;
-				if(-1 == userQueue->dequeue(&buf))
+				sessionArry[count].completeRecvQ.dequeue(&buf);
+				if (!buf)
 					break;
 				sessionArry[count].onGame_Packet(buf);
 				buf->Free();
 				loop++;
 			}
-			if (sessionArry[count].logoutFlag == true && sessionArry[count].sendFlag == false)
-				sessionArry[count].Mode = MODE_LOGOUT_IN_GAME;
+			procPacket += loop;
 		}
 	}
-	return;
 }
 
 void MMOServer::logoutProcess(void)
@@ -551,6 +553,7 @@ void MMOServer::logoutProcess(void)
 	for (count; count < maxSession; count++)
 	{
 		if (dealy == GAME_LOGOUT_DEALY) break;
+
 		if (sessionArry[count].Mode == MODE_LOGOUT_IN_GAME && sessionArry[count].sendFlag == false)
 		{
 			sessionArry[count].onGame_clientLeave();
@@ -566,41 +569,42 @@ void MMOServer::Release(void)
 	Sbuf *buf = NULL;
 	int count = 0;
 	int dealy = 0;
-	lockFreeQueue<Sbuf*> *queue = NULL;
+	SOCKET dummySock = INVALID_SOCKET;
 	for (count; count < maxSession; count++)
 	{
 		if (dealy == GAME_RELEASE_DEALY) break;
 		if (sessionArry[count].Mode == WAIT_LOGOUT)
 		{
 			sessionArry[count].onGame_Release();
-			queue = sessionArry[count].sendQ;
+
 			while (1)
 			{
 				buf = NULL;
-				if (-1 == queue->dequeue(&buf))
-					break;
+				sessionArry[count].sendQ.dequeue(&buf);
+				if (!buf) break;
 				buf->Free();
 			}
-			queue = sessionArry[count].completeRecvQ;
 			while (1)
 			{
 				buf = NULL;
-				if (-1 == queue->dequeue(&buf))
-					break;
+				sessionArry[count].completeRecvQ.dequeue(&buf);
+				if (!buf) break;
 				buf->Free();
 			}
-		
-			sessionArry[count].recvQ.clearBuffer();
-			closesocket(sessionArry[count].sock);
+
+			dummySock = sessionArry[count].sock;
 			sessionArry[count].sock = INVALID_SOCKET;
 			sessionArry[count].accountNo = 0;
+			sessionArry[count].recvQ.clearBuffer();
 			sessionArry[count].logoutFlag = false;
 			sessionArry[count].disconnectFlag = false;
 			sessionArry[count].authTOgame = false;
 			sessionArry[count].shutFlag = false;
 			sessionArry[count].Mode = MODE_NONE;
 			indexStack.push(sessionArry[count].arryIndex);
-			InterlockedDecrement(&sessionCount);
+			closesocket(dummySock);
+			if (InterlockedDecrement(&sessionCount) < 0)
+				CCrashDump::Crash();
 			dealy++;
 		}
 	}
@@ -612,26 +616,23 @@ unsigned __stdcall MMOServer::SendThread(LPVOID _data)
 	MMOServer *node = (MMOServer*)_data;
 	unsigned int maxSession = node->maxSession;
 	player* session = NULL;
-	while (1)
+	while (!node->threadFlag)
 	{
-		if (node->threadFlag)
-			break;
 		session = node->sessionArry;
 		int count = 0;
 		for (count; count < maxSession; count++, session++)
 		{
 			if (session->Mode != MODE_AUTH && session->Mode != MODE_GAME)
 				continue;
-			if (session->sendQ->getUsedSize() > 0)
+			if (session->sendFlag == false || session->sendQ.getUsedSize() > 0)
 				node->sendPost(session);
 		}
 		node->sendFrame++;
-		Sleep(1);
+		Sleep(5);
 	}
 	return 0;
 }
 
-// Net에서 복붙만함.
 unsigned __stdcall MMOServer::WorkerThread(LPVOID _data)
 {
 	MMOServer *node = (MMOServer*)_data;
@@ -655,24 +656,16 @@ unsigned __stdcall MMOServer::WorkerThread(LPVOID _data)
 		}
 		else
 		{
-			if (2 == (int)over)
-			{
-				// 하트비트 전송 파트
-				continue;
-			}
-
 			if (&(_ss->recvOver) == over)
 				node->completeRecv(trans, _ss);
 
 			if (&(_ss->sendOver) == over)
 				node->completeSend(trans, _ss);
 
-			// 멤버변수 하나 추가해줘서 값 받아놓자. 덤프 썼을 때 리턴값 확인용도. iocount<0 이면 crash
 			if (0 == InterlockedDecrement(&_ss->IOCount))
 				_ss->logoutFlag = true;
 		}
 	}
-//	Sbuf::pool->clear();
 	return 0;
 }
 
@@ -687,6 +680,7 @@ void MMOServer::monitoring(void)
 	pAuthFrame = authFrame;
 	pGameFrame = gameFrame;
 	pSendFrame = sendFrame;
+	pProcPacket = procPacket;
 
 	acceptTPS = 0;
 	recvTPS = 0;
@@ -695,6 +689,8 @@ void MMOServer::monitoring(void)
 	authFrame = 0;
 	gameFrame = 0;
 	sendFrame = 0;
+
+	procPacket = 0;
 
 	updatePDH();
 	cpuHandle->UpdateCpuTime();

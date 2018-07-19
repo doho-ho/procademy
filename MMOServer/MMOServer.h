@@ -45,6 +45,8 @@ private:
 	PDH_HQUERY _pdh_Query;
 	PDH_HCOUNTER _pdh_counter_Handle_GMem;
 
+	// test
+	unsigned __int64 procPacket;
 
 protected:
 	unsigned int maxSession;
@@ -58,7 +60,7 @@ protected:
 
 	LONG	pAcceptTPS, pRecvTPS, pSendTPS, pSendCount;
 	LONG	pAuth, pGame, pAuthFrame, pGameFrame, pSendFrame;
-
+	ULONGLONG pProcPacket;
 public:
 	processCPU *cpuHandle;
 	double privateMem;

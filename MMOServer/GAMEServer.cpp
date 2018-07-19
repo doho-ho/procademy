@@ -67,6 +67,10 @@ unsigned __stdcall GAMEServer::printThread(LPVOID data)
 		printf("   accept Total : [ %d ] \n", server->acceptTotal);
 		printf("   accept TPS   : [ %d ] \n", server->pAcceptTPS);
 		printf("   Recv TPS     : [ %d ]  /  Send TPS : [ %d ] \n\n", server->pRecvTPS, server->pSendTPS);
+		printf("[TEET] ==========================================================\n");
+		printf("   Send Count : [ %d ] \n", server->pSendCount);
+		printf("   Packet TPS   : [ %d ] \n", server->pProcPacket);
+		printf("   Recv TPS     : [ %d ]  /  Send TPS : [ %d ] \n\n", server->pRecvTPS, server->pSendTPS);
 
 		client->proc_sendData(dfMONITOR_DATA_TYPE_BATTLE_SERVER_ON, true, timeStamp);
 		client->proc_sendData(dfMONITOR_DATA_TYPE_BATTLE_CPU, server->cpuHandle->ProcessGameTotal(), timeStamp);
