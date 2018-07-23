@@ -59,7 +59,7 @@ void player::onGame_clientLeave(void)
 void player::onGame_Packet(Sbuf *_buf)
 {
 	WORD type;
-	_buf->pop((char*)&type, sizeof(type));
+	*_buf >> type;
 	switch (type)
 	{
 	case en_PACKET_CS_GAME_REQ_ECHO:
@@ -107,14 +107,9 @@ void player:: proc_echo(Sbuf *_buf)
 
 	INT64 acNo = -1;
 	LONGLONG sendTick;
-	_buf->pop((char*)&acNo, sizeof(INT64));
-	_buf->pop((char*)&sendTick, sizeof(LONGLONG));
+	*_buf >> acNo;
+	*_buf >> sendTick;
 
-	if (acNo != accountNo)
-	{
-		disconnect();
-		return;
-	}
 	Sbuf *buf = packet_echo(acNo, sendTick);
 	sendPacket(buf);
 	buf->Free();

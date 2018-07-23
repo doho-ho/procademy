@@ -49,11 +49,15 @@ int main()
 		ControlKey = _getwch();
 		if (ControlKey == L'S' || ControlKey == L's')
 		{
-			server->Start(data);
 		}
 		if (ControlKey == L'Z' || ControlKey == L'z')
 		{
 			proSaveFile();
+		}
+		if (ControlKey == L'C' || ControlKey == L'c')
+		{
+			server->check_completeRecvQ();
+			server->check_sendQ();
 		}
 		Sleep(1000);
 	}

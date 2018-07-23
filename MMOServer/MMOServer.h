@@ -65,6 +65,9 @@ public:
 	processCPU *cpuHandle;
 	double privateMem;
 
+	LONG comQ, pcomQ;
+	LONG sdQ, psdQ;
+
 private:
 	void loadConfig(const char* _configData);
 

@@ -107,6 +107,8 @@ bool MMOServer::Start(const char* _buffer)
 	threadFlag = false;
 	authCount = 0, gameCount = 0;
 	authFrame = 0, gameFrame = 0;
+	comQ = 0;
+	sdQ = 0;
 
 	sessionArry = new player[maxSession];
 	int i =(maxSession-1);
@@ -114,6 +116,7 @@ bool MMOServer::Start(const char* _buffer)
 	{
 		indexStack.push(i);
 		sessionArry[i].set_bufCode(bufCode, bufKey1, bufKey2);
+		sessionArry[i].set_server(this);
 	}
 	// PDH INIT
 	PdhOpenQuery(NULL, NULL, &_pdh_Query);
@@ -271,7 +274,10 @@ void MMOServer::completeRecv(DWORD _trans, player *_ss)
 			recvQ->dequeue(buf->getBufPtr(), headerSize + head.len);
 			buf->moveRearPos(head.len);
 			if (buf->Decode(bufCode, bufKey1, bufKey2))
+			{
+				InterlockedIncrement(&comQ);
 				_ss->completeRecvQ.enqueue(buf);
+			}
 			else
 				throw 4900;
 		}
@@ -307,6 +313,7 @@ void MMOServer::completeSend(DWORD _trans, player *_ss)
 		if (!buf) continue;
 		buf->Free();
 		count++;
+		InterlockedDecrement(&sdQ);
 		InterlockedIncrement(&sendTPS);
 	}
 	InterlockedDecrement(&_ss->sendFlag);
@@ -317,8 +324,6 @@ void MMOServer::completeSend(DWORD _trans, player *_ss)
 			_ss->disconnect();
 		return;
 	}
-	sendPost(_ss);
-	return;
 }
 
 void MMOServer::updatePDH(void)
@@ -442,12 +447,12 @@ void MMOServer::checkProcess(void)
 				sessionArry[count].completeRecvQ.dequeue(&buf);
 				if (!buf)
 					break;
-
+				InterlockedDecrement(&comQ);
 				delayCount++;
 				sessionArry[count].onAuth_Packet(buf);
 				buf->Free();
 			}
-			if (sessionArry[count].logoutFlag == true && sessionArry[count].sendFlag == false)
+			if (sessionArry[count].logoutFlag == true)
 				sessionArry[count].Mode = MODE_LOGOUT_IN_AUTH;
 		}
 	}
@@ -460,14 +465,11 @@ void MMOServer::AUTHMODE(void)
 	int count = 0;
 	for (count; count < maxSession; count++)
 	{
-		if (sessionArry[count].Mode == MODE_LOGOUT_IN_AUTH)
+		if (sessionArry[count].Mode == MODE_LOGOUT_IN_AUTH && 0 == InterlockedCompareExchange(&sessionArry[count].sendFlag,false,false))
 		{
-			if (sessionArry[count].sendFlag == false && sessionArry[count].sendQ.getUsedSize() == 0)
-			{
-				authCount--;
-				InterlockedIncrement(&logoutCount);
-				sessionArry[count].Mode = WAIT_LOGOUT;
-			}
+			sessionArry[count].Mode = WAIT_LOGOUT;
+			authCount--;
+			InterlockedIncrement(&logoutCount);
 		}
 
 		else if (sessionArry[count].authTOgame == true)
@@ -492,11 +494,10 @@ unsigned __stdcall MMOServer::GameThread(LPVOID _data)
 			break;
 		node->GAMEMODE();
 		node->gamePacket();
-	//	node->onGame_Update();
 		node->logoutProcess();
 		node->Release();
 		node->gameFrame++;
-		Sleep(1);
+		Sleep(10);
 	}
 	return 0;
 }
@@ -537,6 +538,7 @@ void MMOServer::gamePacket(void)
 				sessionArry[count].completeRecvQ.dequeue(&buf);
 				if (!buf)
 					break;
+				InterlockedDecrement(&comQ);
 				sessionArry[count].onGame_Packet(buf);
 				buf->Free();
 				loop++;
@@ -628,7 +630,7 @@ unsigned __stdcall MMOServer::SendThread(LPVOID _data)
 				node->sendPost(session);
 		}
 		node->sendFrame++;
-		Sleep(5);
+		Sleep(10);
 	}
 	return 0;
 }
@@ -681,6 +683,8 @@ void MMOServer::monitoring(void)
 	pGameFrame = gameFrame;
 	pSendFrame = sendFrame;
 	pProcPacket = procPacket;
+	pcomQ = comQ;
+	psdQ = sdQ;
 
 	acceptTPS = 0;
 	recvTPS = 0;

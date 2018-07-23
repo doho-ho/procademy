@@ -68,9 +68,9 @@ unsigned __stdcall GAMEServer::printThread(LPVOID data)
 		printf("   accept TPS   : [ %d ] \n", server->pAcceptTPS);
 		printf("   Recv TPS     : [ %d ]  /  Send TPS : [ %d ] \n\n", server->pRecvTPS, server->pSendTPS);
 		printf("[TEET] ==========================================================\n");
-		printf("   Send Count : [ %d ] \n", server->pSendCount);
-		printf("   Packet TPS   : [ %d ] \n", server->pProcPacket);
-		printf("   Recv TPS     : [ %d ]  /  Send TPS : [ %d ] \n\n", server->pRecvTPS, server->pSendTPS);
+		printf("   Send Count : [ %d ]   /  Packet TPS   : [ %d ]\n", server->pSendCount,server->pProcPacket);
+		printf("   COMQ TPS   : [ %d ]  /  sendQ TPS  : [ %d ]  \n\n", server->pcomQ, server->psdQ);
+		printf("   SEND SUCCESS   : [ %d ]  /  SEND ERROR  : [ %d ]  \n\n", server->pcomQ, server->psdQ);
 
 		client->proc_sendData(dfMONITOR_DATA_TYPE_BATTLE_SERVER_ON, true, timeStamp);
 		client->proc_sendData(dfMONITOR_DATA_TYPE_BATTLE_CPU, server->cpuHandle->ProcessGameTotal(), timeStamp);
@@ -86,4 +86,26 @@ unsigned __stdcall GAMEServer::printThread(LPVOID data)
 	}
 	printf("printhread closed\n");
 	return 0;
+}
+
+void GAMEServer::check_completeRecvQ(void)
+{
+	printf("\t//** COMPLETE RECV Q 88//\t\n");
+	int count = 0; 
+	for (count; count < 30000; count++)
+	{
+		if (sessionArry[count].completeRecvQ.getUsedSize() > 0)
+			printf(" %d \t", count);
+	}
+}
+
+void GAMEServer::check_sendQ(void)
+{
+	printf("\t//** SEND Q 88//\t\n");
+	int count = 0;
+	for (count; count < 30000; count++)
+	{
+		if (sessionArry[count].sendQ.getUsedSize() > 0)
+			printf(" %d \t", count);
+	}
 }

@@ -1,5 +1,7 @@
 #pragma once
 
+class MMOServer;
+
 enum en_SESSION_MODE
 {
 	MODE_NONE = 0,
@@ -39,6 +41,8 @@ public:
 	BYTE bufKey1;
 	BYTE bufKey2;
 
+	// test
+	MMOServer *server;
 public:
 	GameSession();
 	~GameSession();
@@ -55,5 +59,8 @@ public:
 	virtual void onGame_Packet(Sbuf *_buf) = 0;
 	
 	virtual void onGame_Release(void) = 0;
+
+	//test
+	void set_server(MMOServer* _server);
 };
 

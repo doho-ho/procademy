@@ -24,6 +24,7 @@ void GameSession::sendPacket(Sbuf *_buf, bool _type)
 	_buf->Encode(bufCode, bufKey1, bufKey2);
 	_buf->addRef();
 	sendQ.enqueue(_buf);
+	InterlockedIncrement(&server->sdQ);
 
 	if (_type)
 	{
@@ -39,4 +40,9 @@ void GameSession::disconnect(void)
 	shutFlag = true;
 	shutdown(sock,2);		// both
 	return;
+}
+
+void GameSession::set_server(MMOServer *_server)
+{
+	server = _server;
 }

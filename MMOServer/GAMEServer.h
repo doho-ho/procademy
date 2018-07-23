@@ -23,4 +23,8 @@ public:
 	int getVersion();
 
 	static unsigned __stdcall printThread(LPVOID _data);
+
+	// test function
+	void check_completeRecvQ(void);
+	void check_sendQ(void);
 };
