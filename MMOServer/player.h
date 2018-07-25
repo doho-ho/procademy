@@ -10,9 +10,6 @@ enum playerStatus
 
 class player : public GameSession
 {
-private:
-	gameServer *server;
-
 public:
 	INT64 accountNo;
 	char sessionKey[64];
@@ -25,7 +22,7 @@ public:
 	player();
 	~player();
 
-	void setSession(SOCKET _sock);
+
 
 	// 로직함수
 		// auth
@@ -33,8 +30,6 @@ public:
 
 		// game
 		void proc_echo(Sbuf *_buf);
-
-		void set_bufCode(BYTE _bufCode, BYTE _bufKey1, BYTE _bufKey2);
 
 	// 패킷 함수
 	Sbuf* packet_loginRes(BYTE _status);

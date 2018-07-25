@@ -7,8 +7,11 @@ private:
 	bool		printFlag;
 	int			Version;
 
+	unsigned int maxUser;
+
 public:
 	monitorClient *client;
+	player *playerArray;
 	
 private:
 	void loadConfig(const char *_configData);

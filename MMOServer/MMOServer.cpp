@@ -21,18 +21,6 @@ void MMOServer::loadConfig(const char *_configData)
 		port = sys["SERVER_PORT"].GetUint();
 		nagleOpt = sys["NAGLE"].GetBool();
 		workerCount = sys["WORKER_THREAD"].GetUint();
-		maxSession = sys["MAX_USER"].GetUint();
-
-
-		rapidjson::Value &code = sys["BUF_KEY"];
-		assert(arry.IsArry());
-
-		bufCode = (char)code[0].GetInt();
-		bufKey1 = (char)code[1].GetInt();
-		bufKey2 = (char)code[2].GetInt();
-
-
-	return;
 }
 
 bool MMOServer::Start(const char* _buffer)
@@ -110,14 +98,6 @@ bool MMOServer::Start(const char* _buffer)
 	comQ = 0;
 	sdQ = 0;
 
-	sessionArry = new player[maxSession];
-	int i =(maxSession-1);
-	for (i; i >= 0; i--)
-	{
-		indexStack.push(i);
-		sessionArry[i].set_bufCode(bufCode, bufKey1, bufKey2);
-		sessionArry[i].set_server(this);
-	}
 	// PDH INIT
 	PdhOpenQuery(NULL, NULL, &_pdh_Query);
 	PdhAddCounter(_pdh_Query, L"\\Process(MMOServer)\\Working Set", NULL, &_pdh_counter_Handle_GMem);
@@ -154,7 +134,7 @@ bool MMOServer::connectRequest(SOCKADDR_IN _sockAddr)
 	return true;
 }
 
-void MMOServer::recvPost(player *_ss)
+void MMOServer::recvPost(GameSession *_ss)
 {
 	DWORD recvVal, flag;
 	int retval, err;
@@ -185,7 +165,7 @@ void MMOServer::recvPost(player *_ss)
 		if (err == WSA_IO_PENDING)
 			return;
 		if (err != WSAECONNRESET && err != WSAESHUTDOWN && err != WSAECONNABORTED)
-			_SYSLOG(L"ERROR", Level::SYS_ERROR, L"RECV POST ERROR [accountNo : %d] %d", _ss->accountNo,err);
+		//	_SYSLOG(L"ERROR", Level::SYS_ERROR, L"RECV POST ERROR [accountNo : %d] %d", _ss->accountNo,err);
 		_ss->disconnect();
 		if (InterlockedDecrement(&_ss->IOCount) == 0)
 			_ss->logoutFlag = true;		
@@ -193,7 +173,7 @@ void MMOServer::recvPost(player *_ss)
 	return;
 }
 
-void MMOServer::sendPost(player *_ss)
+void MMOServer::sendPost(GameSession *_ss)
 {
 	DWORD sendVal;
 	int count, size, retval, err;
@@ -237,7 +217,7 @@ void MMOServer::sendPost(player *_ss)
 			if (err == WSA_IO_PENDING)
 				return;
 			if (err != WSAECONNRESET && err != WSAESHUTDOWN && err != WSAECONNABORTED)
-				_SYSLOG(L"ERROR", Level::SYS_ERROR, L"SEND POST ERROR [accountNo : %d] %d", _ss->accountNo, err);
+//				_SYSLOG(L"ERROR", Level::SYS_ERROR, L"SEND POST ERROR [accountNo : %d] %d", _ss->accountNo, err);
 			_ss->disconnect();
 			InterlockedCompareExchange(&(_ss->sendFlag), FALSE, TRUE);
 			if (InterlockedDecrement(&_ss->IOCount) == 0)
@@ -247,7 +227,7 @@ void MMOServer::sendPost(player *_ss)
 	return;
 }
 
-void MMOServer::completeRecv(DWORD _trans, player *_ss)
+void MMOServer::completeRecv(DWORD _trans, GameSession *_ss)
 {
 	if (_trans == 0)
 	{
@@ -284,7 +264,7 @@ void MMOServer::completeRecv(DWORD _trans, player *_ss)
 		catch (int num)
 		{
 			if(num != 4900)
-				_SYSLOG(L"SYSTEM", Level::SYS_ERROR, L"SBUF ERROR [accountNo : %d] %d",_ss->accountNo, num);
+//				_SYSLOG(L"SYSTEM", Level::SYS_ERROR, L"SBUF ERROR [accountNo : %d] %d",_ss->accountNo, num);
 			_ss->disconnect();
 			return;
 		}
@@ -293,7 +273,7 @@ void MMOServer::completeRecv(DWORD _trans, player *_ss)
 	return;
 }
 
-void MMOServer::completeSend(DWORD _trans, player *_ss)
+void MMOServer::completeSend(DWORD _trans, GameSession *_ss)
 {
 	if (_trans == 0)
 	{
@@ -408,22 +388,23 @@ void MMOServer::acceptProcess(void)
 			delete data;
 			continue;
 		}
+
 		if (indexStack.pop(&index) == -1)
 			CCrashDump::Crash();
 		
-		sessionArry[index].arryIndex = index;
-		sessionArry[index].clientID = setID(index, id);
+		sessionArry[index]->arryIndex = index;
+		sessionArry[index]->clientID = setID(index, id);
 		id++;
-		sessionArry[index].setSession(data->sock);
+		sessionArry[index]->set_session(data->sock);
 		CreateIoCompletionPort((HANDLE)data->sock, IOCPHandle, (ULONG_PTR)&sessionArry[index], 0);
-		InterlockedIncrement(&sessionArry[index].IOCount);
+		InterlockedIncrement(&sessionArry[index]->IOCount);
 
-		sessionArry[index].onAuth_clientJoin();
-		recvPost(&sessionArry[index]);
-		sessionArry[index].Mode = MODE_AUTH;
+		sessionArry[index]->onAuth_clientJoin();
+		recvPost(sessionArry[index]);
+		sessionArry[index]->Mode = MODE_AUTH;
 		authCount++;
-		if (InterlockedDecrement(&sessionArry[index].IOCount) == 0)
-			sessionArry[index].logoutFlag = true;
+		if (InterlockedDecrement(&sessionArry[index]->IOCount) == 0)
+			sessionArry[index]->logoutFlag = true;
 		count++;
 		delete data;
 	}
@@ -438,22 +419,22 @@ void MMOServer::checkProcess(void)
 	Sbuf *buf = NULL;
 	for (count; count < maxSession; count++)
 	{
-		if (sessionArry[count].Mode == MODE_AUTH)
+		if (sessionArry[count]->Mode == MODE_AUTH)
 		{
 			while (delayCount < AUTH_PACKET_DELAY)
 			{
 				buf = NULL;
 
-				sessionArry[count].completeRecvQ.dequeue(&buf);
+				sessionArry[count]->completeRecvQ.dequeue(&buf);
 				if (!buf)
 					break;
 				InterlockedDecrement(&comQ);
 				delayCount++;
-				sessionArry[count].onAuth_Packet(buf);
+				sessionArry[count]->onAuth_Packet(buf);
 				buf->Free();
 			}
-			if (sessionArry[count].logoutFlag == true)
-				sessionArry[count].Mode = MODE_LOGOUT_IN_AUTH;
+			if (sessionArry[count]->logoutFlag == true)
+				sessionArry[count]->Mode = MODE_LOGOUT_IN_AUTH;
 		}
 	}
 		
@@ -465,22 +446,22 @@ void MMOServer::AUTHMODE(void)
 	int count = 0;
 	for (count; count < maxSession; count++)
 	{
-		if (sessionArry[count].Mode == MODE_LOGOUT_IN_AUTH && 0 == InterlockedCompareExchange(&sessionArry[count].sendFlag,false,false))
+		if (sessionArry[count]->Mode == MODE_LOGOUT_IN_AUTH && 0 == InterlockedCompareExchange(&sessionArry[count]->sendFlag,false,false))
 		{
-			sessionArry[count].Mode = WAIT_LOGOUT;
+			sessionArry[count]->Mode = WAIT_LOGOUT;
 			authCount--;
 			InterlockedIncrement(&logoutCount);
 		}
 
-		else if (sessionArry[count].authTOgame == true)
+		else if (sessionArry[count]->authTOgame == true)
 		{
 			authCount--;
-			sessionArry[count].Mode = MODE_AUTH_TO_GAME;
-			sessionArry[count].authTOgame = false;
+			sessionArry[count]->Mode = MODE_AUTH_TO_GAME;
+			sessionArry[count]->authTOgame = false;
 		}
 		else
 			continue;
-		sessionArry[count].onAuth_clientLeave();
+		sessionArry[count]->onAuth_clientLeave();
 	}
 	return;
 }
@@ -509,15 +490,15 @@ void MMOServer::GAMEMODE(void)
 	for (count; count < maxSession; count++)
 	{
 		if (dealy == GAME_MODE_DEALY)break;
-		if (sessionArry[count].Mode == MODE_AUTH_TO_GAME)
+		if (sessionArry[count]->Mode == MODE_AUTH_TO_GAME)
 		{
 			gameCount++; 
-			sessionArry[count].Mode = MODE_GAME;
-			sessionArry[count].onGame_clientJoin();
+			sessionArry[count]->Mode = MODE_GAME;
+			sessionArry[count]->onGame_clientJoin();
 			dealy++;
 		}
-		if (sessionArry[count].logoutFlag == true && sessionArry[count].sendFlag == false)
-			sessionArry[count].Mode = MODE_LOGOUT_IN_GAME;
+		if (sessionArry[count]->logoutFlag == true && sessionArry[count]->sendFlag == false)
+			sessionArry[count]->Mode = MODE_LOGOUT_IN_GAME;
 	}
 	return;
 }
@@ -529,17 +510,17 @@ void MMOServer::gamePacket(void)
 	Sbuf *buf = NULL;
 	for (count; count < maxSession; count++)
 	{
-		if (sessionArry[count].Mode == MODE_GAME)
+		if (sessionArry[count]->Mode == MODE_GAME)
 		{
 			loop = 0;
 			while (loop < GAME_PACKET_DEALY)
 			{
 				buf = NULL;
-				sessionArry[count].completeRecvQ.dequeue(&buf);
+				sessionArry[count]->completeRecvQ.dequeue(&buf);
 				if (!buf)
 					break;
 				InterlockedDecrement(&comQ);
-				sessionArry[count].onGame_Packet(buf);
+				sessionArry[count]->onGame_Packet(buf);
 				buf->Free();
 				loop++;
 			}
@@ -556,10 +537,10 @@ void MMOServer::logoutProcess(void)
 	{
 		if (dealy == GAME_LOGOUT_DEALY) break;
 
-		if (sessionArry[count].Mode == MODE_LOGOUT_IN_GAME && sessionArry[count].sendFlag == false)
+		if (sessionArry[count]->Mode == MODE_LOGOUT_IN_GAME && sessionArry[count]->sendFlag == false)
 		{
-			sessionArry[count].onGame_clientLeave();
-			sessionArry[count].Mode = WAIT_LOGOUT;
+			sessionArry[count]->onGame_clientLeave();
+			sessionArry[count]->Mode = WAIT_LOGOUT;
 			gameCount--;
 			dealy++;
 		}
@@ -575,35 +556,33 @@ void MMOServer::Release(void)
 	for (count; count < maxSession; count++)
 	{
 		if (dealy == GAME_RELEASE_DEALY) break;
-		if (sessionArry[count].Mode == WAIT_LOGOUT)
+		if (sessionArry[count]->Mode == WAIT_LOGOUT)
 		{
-			sessionArry[count].onGame_Release();
+			sessionArry[count]->onGame_Release();
 
 			while (1)
 			{
 				buf = NULL;
-				sessionArry[count].sendQ.dequeue(&buf);
+				sessionArry[count]->sendQ.dequeue(&buf);
 				if (!buf) break;
 				buf->Free();
 			}
 			while (1)
 			{
 				buf = NULL;
-				sessionArry[count].completeRecvQ.dequeue(&buf);
+				sessionArry[count]->completeRecvQ.dequeue(&buf);
 				if (!buf) break;
 				buf->Free();
 			}
 
-			dummySock = sessionArry[count].sock;
-			sessionArry[count].sock = INVALID_SOCKET;
-			sessionArry[count].accountNo = 0;
-			sessionArry[count].recvQ.clearBuffer();
-			sessionArry[count].logoutFlag = false;
-			sessionArry[count].disconnectFlag = false;
-			sessionArry[count].authTOgame = false;
-			sessionArry[count].shutFlag = false;
-			sessionArry[count].Mode = MODE_NONE;
-			indexStack.push(sessionArry[count].arryIndex);
+			dummySock = sessionArry[count]->sock;
+			sessionArry[count]->sock = INVALID_SOCKET;
+			sessionArry[count]->recvQ.clearBuffer();
+			sessionArry[count]->logoutFlag = false;
+			sessionArry[count]->disconnectFlag = false;
+			sessionArry[count]->authTOgame = false;
+			sessionArry[count]->Mode = MODE_NONE;
+			indexStack.push(sessionArry[count]->arryIndex);
 			closesocket(dummySock);
 			if (InterlockedDecrement(&sessionCount) < 0)
 				CCrashDump::Crash();
@@ -617,17 +596,17 @@ unsigned __stdcall MMOServer::SendThread(LPVOID _data)
 {
 	MMOServer *node = (MMOServer*)_data;
 	unsigned int maxSession = node->maxSession;
-	player* session = NULL;
+	GameSession** session = NULL;
 	while (!node->threadFlag)
 	{
-		session = node->sessionArry;
+		session = (node->sessionArry);
 		int count = 0;
-		for (count; count < maxSession; count++, session++)
+		for (count; count < maxSession; count++)
 		{
-			if (session->Mode != MODE_AUTH && session->Mode != MODE_GAME)
+			if (session[count]->Mode != MODE_AUTH && session[count]->Mode != MODE_GAME)
 				continue;
-			if (session->sendFlag == false || session->sendQ.getUsedSize() > 0)
-				node->sendPost(session);
+			if (session[count]->sendFlag == false || session[count]->sendQ.getUsedSize() > 0)
+				node->sendPost(session[count]);
 		}
 		node->sendFrame++;
 		Sleep(10);
@@ -698,4 +677,18 @@ void MMOServer::monitoring(void)
 
 	updatePDH();
 	cpuHandle->UpdateCpuTime();
+}
+
+void MMOServer::setSessionArry(player *_array, unsigned int _maxSession)
+{
+	maxSession = _maxSession;
+	sessionArry = (GameSession**)malloc(sizeof(GameSession*) * maxSession);
+	unsigned int count = 0;
+	for (count; count < maxSession; count++, _array++)
+	{
+		sessionArry[count] = _array;
+		indexStack.push(count);
+		sessionArry[count]->set_bufCode(bufCode, bufKey1, bufKey2);
+		sessionArry[count]->set_server(this);
+	}
 }

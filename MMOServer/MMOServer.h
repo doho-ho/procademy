@@ -28,19 +28,11 @@ private:
 	LONG acceptTPS;
 
 	// Monitoring
-	LONG recvTPS;
-	LONG sendTPS;
-	LONG authCount;
-	LONG gameCount;
+	LONG recvTPS, sendTPS;				// TPS
+	LONG authCount, gameCount;			// 유저수
 	LONG sendCount;
 	LONG logoutCount;
-	LONG authFrame;
-	LONG gameFrame;
-	LONG sendFrame;
-
-	BYTE bufCode;
-	BYTE bufKey1;
-	BYTE bufKey2;
+	LONG authFrame, gameFrame, sendFrame;	// 프레임수
 
 	PDH_HQUERY _pdh_Query;
 	PDH_HCOUNTER _pdh_counter_Handle_GMem;
@@ -49,9 +41,13 @@ private:
 	unsigned __int64 procPacket;
 
 protected:
+	BYTE bufCode;
+	BYTE bufKey1;
+	BYTE bufKey2;
+
 	unsigned int maxSession;
+	GameSession	 **sessionArry;
 	lockFreeStack<unsigned int> indexStack;
-	player	 *sessionArry;
 
 	lockFreeQueue<AUTH_DATA*> AUTHQ;
 
@@ -72,16 +68,18 @@ private:
 	void loadConfig(const char* _configData);
 
 	bool connectRequest(SOCKADDR_IN _sockAddr);
-	void recvPost(player *_ss);
-	void sendPost(player *_ss);
-	void completeSend(DWORD _trans, player *_ss);
-	void completeRecv(DWORD _trans, player *_ss);
+	void recvPost(GameSession *_ss);
+	void sendPost(GameSession *_ss);
+	void completeSend(DWORD _trans, GameSession *_ss);
+	void completeRecv(DWORD _trans, GameSession *_ss);
 
 	void updatePDH(void);
 
 public:
 	MMOServer() {};
 	~MMOServer() {};
+
+	void setSessionArry(player *_array, unsigned int _maxSession);
 	// 스레드
 	static unsigned __stdcall acceptThread(LPVOID _data);
 

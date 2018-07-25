@@ -32,10 +32,9 @@ public:
 	LONG sendFlag;
 	LONG IOCount;
 
-	bool logoutFlag;
-	bool authTOgame;
-	bool shutFlag;
-	LONG disconnectFlag;
+	bool logoutFlag;					// IOCP COUNT 0 플래그 (이 플래그가 TRUE이면 LOGOUT)
+	bool authTOgame;				// AUTH -> GAME 체크 플래그
+	LONG disconnectFlag;			// 보내고 끊기 플래그
 
 	BYTE bufCode;
 	BYTE bufKey1;
@@ -43,6 +42,7 @@ public:
 
 	// test
 	MMOServer *server;
+
 public:
 	GameSession();
 	~GameSession();
@@ -59,6 +59,9 @@ public:
 	virtual void onGame_Packet(Sbuf *_buf) = 0;
 	
 	virtual void onGame_Release(void) = 0;
+
+	void set_bufCode(BYTE _bufCode, BYTE _bufKey1, BYTE _bufKey2);
+	void set_session(SOCKET _sock);
 
 	//test
 	void set_server(MMOServer* _server);

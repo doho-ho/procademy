@@ -9,6 +9,9 @@ GAMEServer::GAMEServer(const char *_configData)
 	Version = 0.1;
 	client = new monitorClient(_configData);
 
+	playerArray = new player[maxUser];
+	setSessionArry(playerArray, maxUser);
+
 	Start(_configData);
 
 	printHandle = (HANDLE)_beginthreadex(NULL, 0, printThread, (LPVOID)this, 0, 0);
@@ -21,9 +24,23 @@ GAMEServer::~GAMEServer()
 	CloseHandle(printHandle);
 }
 
-void GAMEServer::loadConfig(const char *_config)
+void GAMEServer::loadConfig(const char *_configData)
 {
+	// config 파일 읽어와서 멤버 변수에 값 저장.
+	rapidjson::Document Doc;
+	Doc.Parse(_configData);
 
+	char mIP[16];
+
+	rapidjson::Value &sys = Doc["NET"];
+	maxUser = sys["MAX_USER"].GetUint();
+
+	rapidjson::Value &code = sys["BUF_KEY"];
+	assert(arry.IsArry());
+
+	bufCode = (char)code[0].GetInt();
+	bufKey1 = (char)code[1].GetInt();
+	bufKey2 = (char)code[2].GetInt();
 }
 
 void GAMEServer::onAuth_Update()
@@ -92,9 +109,9 @@ void GAMEServer::check_completeRecvQ(void)
 {
 	printf("\t//** COMPLETE RECV Q 88//\t\n");
 	int count = 0; 
-	for (count; count < 30000; count++)
+	for (count; count < maxUser; count++)
 	{
-		if (sessionArry[count].completeRecvQ.getUsedSize() > 0)
+		if (sessionArry[count]->completeRecvQ.getUsedSize() > 0)
 			printf(" %d \t", count);
 	}
 }
@@ -103,9 +120,9 @@ void GAMEServer::check_sendQ(void)
 {
 	printf("\t//** SEND Q 88//\t\n");
 	int count = 0;
-	for (count; count < 30000; count++)
+	for (count; count < maxUser; count++)
 	{
-		if (sessionArry[count].sendQ.getUsedSize() > 0)
+		if (sessionArry[count]->sendQ.getUsedSize() > 0)
 			printf(" %d \t", count);
 	}
 }

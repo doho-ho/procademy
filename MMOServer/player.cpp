@@ -12,11 +12,7 @@ player::~player()
 
 }
 
-void player::setSession(SOCKET _sock)
-{
-	sock = _sock;
-	return;
-}
+
 
 
 void player::onAuth_clientJoin(void)
@@ -113,13 +109,6 @@ void player:: proc_echo(Sbuf *_buf)
 	Sbuf *buf = packet_echo(acNo, sendTick);
 	sendPacket(buf);
 	buf->Free();
-}
-
-void player::set_bufCode(BYTE _bufCode, BYTE _bufKey1, BYTE _bufKey2)
-{
-	bufCode = _bufCode;
-	bufKey1 = _bufKey1;
-	bufKey2 = _bufKey2;
 }
 
 Sbuf* player::packet_loginRes(BYTE _status)
