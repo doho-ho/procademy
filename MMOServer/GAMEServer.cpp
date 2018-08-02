@@ -36,7 +36,6 @@ void GAMEServer::loadConfig(const char *_configData)
 	maxUser = sys["MAX_USER"].GetUint();
 
 	rapidjson::Value &code = sys["BUF_KEY"];
-	assert(arry.IsArry());
 
 	bufCode = (char)code[0].GetInt();
 	bufKey1 = (char)code[1].GetInt();
@@ -75,19 +74,17 @@ unsigned __stdcall GAMEServer::printThread(LPVOID data)
 		printf("=================================================================\n");
 		printf("\t\t\t\t*** GameServer ***\n\n");
 		printf("[GAME] ========================================================\n");
-		printf("   User Count : [ %03d ] \n", server->sessionCount);
+		printf("   User Count : [ %01d ] \n", server->sessionCount);
 		printf("   AUTH Q : [ %03d ]  / SEND THREAD : [ %d ] \n", server->AUTHQ.getUsedSize(), server->pSendFrame);
 		printf("   AUTH Mode : [ %d ]  /  GAME Mode : [ %d ] \n", server->pAuth, server->pGame);
 		printf("   AUTH THREAD : [ %d ]  / GAME THREAD : [ %d ]\n", server->pAuthFrame, server->pGameFrame);
 		printf("   Sbuf Alloc : [ %d ]  /  Sbuf Used : [ %d ] \n", pool->getAllocCount(), pool->getUsedCount());
+		printf("   COMQ USED   : [ %d ]  /  sendQ USED  : [ %d ]  \n", server->pcomQ, server->psdQ);
 		printf("[NET] ==========================================================\n");
 		printf("   accept Total : [ %d ] \n", server->acceptTotal);
 		printf("   accept TPS   : [ %d ] \n", server->pAcceptTPS);
-		printf("   Recv TPS     : [ %d ]  /  Send TPS : [ %d ] \n\n", server->pRecvTPS, server->pSendTPS);
-		printf("[TEET] ==========================================================\n");
-		printf("   Send Count : [ %d ]   /  Packet TPS   : [ %d ]\n", server->pSendCount,server->pProcPacket);
-		printf("   COMQ TPS   : [ %d ]  /  sendQ TPS  : [ %d ]  \n\n", server->pcomQ, server->psdQ);
-		printf("   SEND SUCCESS   : [ %d ]  /  SEND ERROR  : [ %d ]  \n\n", server->pcomQ, server->psdQ);
+		printf("   Recv TPS     : [ %d ]  /  Send TPS : [ %d ]\n", server->pRecvTPS, server->pSendTPS);
+		printf("   PACKET PROC : [ %d ]   /  SEND PROC  : [ %d ] \n\n", server->pProcPacket, server->pSendCount);
 
 		client->proc_sendData(dfMONITOR_DATA_TYPE_BATTLE_SERVER_ON, true, timeStamp);
 		client->proc_sendData(dfMONITOR_DATA_TYPE_BATTLE_CPU, server->cpuHandle->ProcessGameTotal(), timeStamp);
@@ -99,7 +96,7 @@ unsigned __stdcall GAMEServer::printThread(LPVOID data)
 		client->proc_sendData(dfMONITOR_DATA_TYPE_BATTLE_SESSION_AUTH, server->pAuth, timeStamp);
 		client->proc_sendData(dfMONITOR_DATA_TYPE_BATTLE_SESSION_GAME, server->pGame, timeStamp);
 		
-		Sleep(990);
+		Sleep(900);
 	}
 	printf("printhread closed\n");
 	return 0;

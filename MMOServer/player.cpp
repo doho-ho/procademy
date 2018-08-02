@@ -88,6 +88,7 @@ void player::proc_loginReq(Sbuf *_buf)
 	int Version;
 	*_buf >> Version;
 
+
 	BYTE status = 1;
 
 	authTOgame = true;
@@ -117,6 +118,7 @@ Sbuf* player::packet_loginRes(BYTE _status)
 	//		BYTE	Status (0: 실패 / 1: 성공 / 2: 신규캐릭터 선택 모드 / 3:버전 다름.)
 	//		INT64	AccountNo
 	Sbuf *buf = Sbuf::Alloc();
+
 	*buf << (WORD)en_PACKET_CS_GAME_RES_LOGIN;
 	*buf << _status;
 	*buf << accountNo;
@@ -130,6 +132,7 @@ Sbuf *player::packet_echo(INT64 _acNo, LONGLONG _sendTick)
 	//		INT64		AccountoNo
 	//		LONGLONG	SendTick
 	Sbuf *buf = Sbuf::Alloc();
+
 	*buf << (WORD)en_PACKET_CS_GAME_RES_ECHO;
 	buf->push((char*)&_acNo, sizeof(INT64));
 	buf->push((char*)&_sendTick, sizeof(LONGLONG));
