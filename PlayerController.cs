@@ -128,14 +128,6 @@ namespace Gamekit3D
 
             cameraSettings = FindObjectOfType<CameraSettings>();
 
-            if (cameraSettings != null)
-            {
-                if (cameraSettings.follow == null)
-                    cameraSettings.follow = transform;
-
-                if (cameraSettings.lookAt == null)
-                    cameraSettings.follow = transform.Find("HeadTarget");
-            }
         }
 
         // Called automatically by Unity when the script first exists in the scene.
@@ -318,7 +310,7 @@ namespace Gamekit3D
             Vector2 moveInput = m_Input.MoveInput;
             Vector3 localMovementDirection = new Vector3(moveInput.x, 0f, moveInput.y).normalized;
             
-            Vector3 forward = Quaternion.Euler(0f, cameraSettings.Current.m_XAxis.Value, 0f) * Vector3.forward;
+            Vector3 forward = Quaternion.Euler(0f, cameraSettings.transform.position.y, 0f) * Vector3.forward;
             forward.y = 0f;
             forward.Normalize();
 
@@ -524,10 +516,13 @@ namespace Gamekit3D
 
             // Rotate the transform of the character controller by the animation's root rotation.
             m_CharCtrl.transform.rotation *= m_Animator.deltaRotation;
-
+                       
+        
             // Add to the movement with the calculated vertical speed.
             movement += m_VerticalSpeed * Vector3.up * Time.deltaTime;
 
+            
+            
             // Move the character controller.
             m_CharCtrl.Move(movement);
 
